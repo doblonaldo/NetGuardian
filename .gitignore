@@ -1,0 +1,34 @@
+# Variáveis de ambiente e credenciais sensíveis (Senhas, Tokens, DB)
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# Ambientes Virtuais (Dependências)
+.venv/
+venv/
+env/
+
+# Python Cache e Arquivos Compilados
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Logs
+*.log
+
+# Bancos de Dados locais
+*.sqlite3
+
+# Testes e Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Diretórios de IDEs
+.vscode/
+.idea/
+*.swp
