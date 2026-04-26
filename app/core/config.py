@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     POSTGRES_DB: str
     POSTGRES_PORT: str = "5432"
 
+    NETBOX_URL: str = "http://localhost:8000"
+    NETBOX_TOKEN: str = ""
+
+    LIBRENMS_URL: str = "http://localhost:8000"
+    LIBRENMS_TOKEN: str = ""
+
+    DEVICE_DEFAULT_USERNAME: str = "admin"
+    DEVICE_DEFAULT_PASSWORD: str = "admin"
+
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

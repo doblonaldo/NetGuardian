@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from app.core.config import settings
-from app.api.routes import devices, validations, collect
+from app.api.routes import devices, validations, sync
 from app.core.database import engine, Base
+import app.models  # Importa todos os models para registrar no Base.metadata
 import contextlib
 
 @contextlib.asynccontextmanager
@@ -21,7 +22,7 @@ app = FastAPI(
 
 app.include_router(devices.router, prefix=f"{settings.API_V1_STR}/devices", tags=["devices"])
 app.include_router(validations.router, prefix=f"{settings.API_V1_STR}/validations", tags=["validations"])
-app.include_router(collect.router, prefix=f"{settings.API_V1_STR}/collect", tags=["collect"])
+app.include_router(sync.router, prefix=f"{settings.API_V1_STR}/sync", tags=["sync"])
 
 @app.get("/")
 async def root():

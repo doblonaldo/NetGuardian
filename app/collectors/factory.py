@@ -1,11 +1,13 @@
 from typing import Type
 from app.collectors.base import BaseCollector
 from app.collectors.cisco_ios import CiscoIOSCollector
+from app.collectors.huawei_collector import HuaweiCollector
 # Import other collectors...
 
 class CollectorFactory:
     _collectors = {
         "cisco_ios": CiscoIOSCollector,
+        "huawei": HuaweiCollector,
         # "juniper_junos": JuniperJunosCollector,
     }
 
