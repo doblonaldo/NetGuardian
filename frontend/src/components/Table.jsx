@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function Table({ columns, data, keyField = 'id', emptyMessage = 'Nenhum dado encontrado.', isLoading = false }) {
+export default function Table({ columns, data, keyField = 'id', emptyMessage = 'Nenhum dado encontrado.', isLoading = false, rowClassName }) {
   return (
     <div className="overflow-x-auto w-full">
       <table className="w-full text-left text-sm text-slate-300">
@@ -22,7 +22,7 @@ export default function Table({ columns, data, keyField = 'id', emptyMessage = '
             </tr>
           ) : data && data.length > 0 ? (
             data.map((row, rowIndex) => (
-              <tr key={row[keyField] || rowIndex} className="hover:bg-slate-700/20 transition-colors group">
+              <tr key={row[keyField] || rowIndex} className={`hover:bg-slate-700/20 transition-colors group ${rowClassName ? rowClassName(row) : ''}`}>
                 {columns.map((col, colIndex) => (
                   <td key={colIndex} className={`px-6 py-4 ${col.cellClassName || ''}`}>
                     {col.render ? col.render(row) : row[col.accessor]}

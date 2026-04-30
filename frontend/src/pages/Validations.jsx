@@ -1,81 +1,130 @@
-import React, { useState, useEffect } from 'react';
-import { RefreshCw, Search, Filter, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { RefreshCw, Search, Filter, Clock, AlertTriangle, XCircle } from 'lucide-react';
+import Card from '../components/Card';
+import Table from '../components/Table';
+import StatusBadge from '../components/StatusBadge';
+import Loader from '../components/Loader';
+import useAutoRefresh from '../hooks/useAutoRefresh';
+import { apiService } from '../services/api';
 
 export default function Validations() {
   const [validations, setValidations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
   
-  // Filters
   const [filterDevice, setFilterDevice] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('ALL');
 
-  const fetchValidations = async () => {
-    setLoading(true);
+  const fetchValidations = useCallback(async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/validations`);
-      if (response.ok) {
-        const data = await response.json();
-        setValidations(Array.isArray(data) ? data : []);
-      } else {
-        console.error("Erro ao buscar validações");
-      }
+      const data = await apiService.getValidations();
+      setValidations(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Falha na requisição:", error);
+      throw error;
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchValidations();
   }, []);
 
-  const getSeverityWeight = (severity) => {
-    switch (severity?.toUpperCase()) {
-      case 'CRITICAL': return 3;
-      case 'WARNING': return 2;
-      case 'INFO': return 1;
-      default: return 0;
-    }
-  };
+  const { secondsAgo, isFetching, error, manualRefresh } = useAutoRefresh(fetchValidations, 30000);
 
-  const getSeverityStyles = (severity) => {
-    switch (severity?.toUpperCase()) {
-      case 'CRITICAL': return 'bg-rose-500/10 text-rose-500 border-rose-500/20';
-      case 'WARNING': return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-      case 'INFO': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      default: return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    }
-  };
+  const filteredAndSortedValidations = useMemo(() => {
+    const getSeverityWeight = (severity) => {
+      switch (severity?.toUpperCase()) {
+        case 'CRITICAL': return 3;
+        case 'WARNING': return 2;
+        case 'INFO': return 1;
+        default: return 0;
+      }
+    };
 
-  const filteredAndSortedValidations = validations
-    .filter(v => {
-      const deviceName = (v.device_name || v.device || v.host || '').toLowerCase();
-      const matchesDevice = deviceName.includes(filterDevice.toLowerCase());
-      const matchesSeverity = filterSeverity === 'ALL' || (v.severity?.toUpperCase() === filterSeverity);
-      return matchesDevice && matchesSeverity;
-    })
-    .sort((a, b) => getSeverityWeight(b.severity) - getSeverityWeight(a.severity));
+    return validations
+      .filter(v => {
+        const deviceName = (v.device_name || v.device || v.host || '').toLowerCase();
+        const matchesDevice = deviceName.includes(filterDevice.toLowerCase());
+        const matchesSeverity = filterSeverity === 'ALL' || (v.severity?.toUpperCase() === filterSeverity);
+        return matchesDevice && matchesSeverity;
+      })
+      .sort((a, b) => getSeverityWeight(b.severity) - getSeverityWeight(a.severity));
+  }, [validations, filterDevice, filterSeverity]);
+
+  const criticalAlertsCount = useMemo(() => {
+    return validations.filter(v => v.severity?.toUpperCase() === 'CRITICAL').length;
+  }, [validations]);
+
+  const columns = [
+    {
+      header: 'Device',
+      accessor: 'device',
+      className: 'w-[20%]',
+      cellClassName: 'font-medium text-slate-200 whitespace-nowrap',
+      render: (row) => row.device_name || row.device || row.host || '-'
+    },
+    {
+      header: 'Tipo',
+      accessor: 'type',
+      className: 'w-[15%]',
+      cellClassName: 'text-slate-400 whitespace-nowrap',
+      render: (row) => row.rule_type || row.type || row.category || '-'
+    },
+    {
+      header: 'Severidade',
+      accessor: 'severity',
+      className: 'w-[15%]',
+      cellClassName: 'whitespace-nowrap',
+      render: (row) => <StatusBadge status={row.severity} />
+    },
+    {
+      header: 'Mensagem',
+      accessor: 'message',
+      className: 'w-[50%]',
+      cellClassName: 'text-slate-400 min-w-[300px]',
+      render: (row) => row.message || row.description || row.rule_name || '-'
+    }
+  ];
+
+  if (initialLoading) {
+    return <Loader text="Carregando validações..." />;
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Validações</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white tracking-tight">Validações</h1>
+            {criticalAlertsCount > 0 && (
+              <span className="bg-rose-500/20 text-rose-500 border border-rose-500/50 px-2.5 py-0.5 rounded-full text-xs font-bold animate-pulse flex items-center gap-1 shadow-[0_0_12px_rgba(244,63,94,0.3)]">
+                <AlertTriangle className="w-3 h-3" /> {criticalAlertsCount} CRÍTICOS
+              </span>
+            )}
+          </div>
           <p className="text-slate-400 text-sm mt-1">Histórico completo de auditorias e alertas da rede.</p>
         </div>
-        <button 
-          onClick={fetchValidations}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-blue-500/20 active:scale-95 flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Atualizando...' : 'Atualizar Lista'}
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button 
+            onClick={manualRefresh}
+            disabled={isFetching}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Atualizando...' : 'Atualizar Lista'}
+          </button>
+          <span className="text-xs text-slate-500 flex items-center gap-1">
+            <Clock className="w-3 h-3" /> Atualizado há {secondsAgo}s
+          </span>
+        </div>
       </div>
 
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-500/50 rounded-lg p-4 flex items-center gap-3 animate-in fade-in">
+          <XCircle className="w-5 h-5 text-rose-500" />
+          <p className="text-rose-200 text-sm font-medium">{error}</p>
+        </div>
+      )}
+
       {/* Filters Section */}
-      <div className="bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 shadow-sm flex flex-col sm:flex-row gap-4">
+      <Card className="flex flex-col sm:flex-row gap-4 p-4">
         <div className="flex-1 relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input 
@@ -83,7 +132,7 @@ export default function Validations() {
             placeholder="Buscar por device..." 
             value={filterDevice}
             onChange={(e) => setFilterDevice(e.target.value)}
-            className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg pl-9 pr-4 py-2 outline-none focus:border-blue-500 transition-colors"
+            className="w-full bg-noc-bg border border-noc-border text-slate-200 text-sm rounded-lg pl-9 pr-4 py-2 outline-none focus:border-blue-500 transition-colors"
           />
         </div>
         <div className="sm:w-64 relative">
@@ -91,7 +140,7 @@ export default function Validations() {
           <select 
             value={filterSeverity}
             onChange={(e) => setFilterSeverity(e.target.value)}
-            className="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-lg pl-9 pr-4 py-2 outline-none focus:border-blue-500 transition-colors appearance-none cursor-pointer relative"
+            className="w-full bg-noc-bg border border-noc-border text-slate-200 text-sm rounded-lg pl-9 pr-4 py-2 outline-none focus:border-blue-500 transition-colors appearance-none cursor-pointer relative"
           >
             <option value="ALL">Todas Severidades</option>
             <option value="CRITICAL">Critical</option>
@@ -99,61 +148,27 @@ export default function Validations() {
             <option value="INFO">Info</option>
           </select>
         </div>
-      </div>
+      </Card>
 
       {/* Table Section */}
-      <div className="bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-300">
-            <thead className="text-xs text-slate-400 uppercase bg-slate-900/50 border-b border-slate-700/50">
-              <tr>
-                <th scope="col" className="px-6 py-4 font-semibold">Device</th>
-                <th scope="col" className="px-6 py-4 font-semibold">Tipo</th>
-                <th scope="col" className="px-6 py-4 font-semibold">Severidade</th>
-                <th scope="col" className="px-6 py-4 font-semibold">Mensagem</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {loading && validations.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center text-slate-500">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-3 text-blue-500" />
-                    Carregando validações...
-                  </td>
-                </tr>
-              ) : filteredAndSortedValidations.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="px-6 py-12 text-center text-slate-500">
-                    <CheckCircle className="w-8 h-8 mx-auto mb-3 text-emerald-500/50" />
-                    Nenhuma validação encontrada.
-                  </td>
-                </tr>
-              ) : (
-                filteredAndSortedValidations.map((val, i) => {
-                  const severity = val.severity?.toUpperCase() || 'UNKNOWN';
-                  return (
-                    <tr key={i} className="hover:bg-slate-700/20 transition-colors group">
-                      <td className="px-6 py-4 font-medium text-slate-200 whitespace-nowrap">
-                        {val.device_name || val.device || val.host || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-400">
-                        {val.rule_type || val.type || val.category || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${getSeverityStyles(severity)}`}>
-                          {severity}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-400 min-w-[300px]">
-                        {val.message || val.description || val.rule_name || '-'}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="bg-noc-panel border border-noc-border rounded-xl shadow-sm overflow-hidden relative min-h-[200px]">
+        {isFetching && validations.length > 0 && (
+          <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/20 overflow-hidden z-10">
+            <div className="h-full bg-blue-500 w-1/3 animate-[translateX_1s_infinite_ease-in-out] translate-x-[-100%]"></div>
+          </div>
+        )}
+        {isFetching && validations.length === 0 ? (
+          <Loader text="Carregando validações..." />
+        ) : error && validations.length === 0 ? (
+          <div className="p-12 text-center text-slate-500">Não foi possível carregar os dados. Tente atualizar a página.</div>
+        ) : (
+          <Table 
+            columns={columns} 
+            data={filteredAndSortedValidations} 
+            emptyMessage="Nenhuma validação encontrada para os filtros atuais."
+            rowClassName={(row) => row.severity?.toUpperCase() === 'CRITICAL' ? 'bg-rose-500/10 border-l border-rose-500/50 hover:bg-rose-500/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.05)]' : ''}
+          />
+        )}
       </div>
     </div>
   );

@@ -2,11 +2,15 @@
 
 @theme {
   --color-brand-blue: #3b82f6;
+  --color-noc-bg: #0b0f19;
+  --color-noc-panel: #111524;
+  --color-noc-panel-hover: #161b2e;
+  --color-noc-border: #1e2538;
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
 @layer base {
   body {
-    @apply bg-slate-900 text-slate-200 antialiased;
+    @apply bg-noc-bg text-slate-200 antialiased;
   }
 }

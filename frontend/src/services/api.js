@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Instância base do axios
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -32,14 +32,14 @@ export const apiService = {
    * Retorna a lista de todos os dispositivos.
    */
   getDevices: async () => {
-    return await api.get('/devices');
+    return await api.get('/devices/');
   },
 
   /**
    * Retorna todas as validações ativas (ou histórico) no sistema.
    */
   getValidations: async () => {
-    return await api.get('/validations');
+    return await api.get('/validations/');
   },
 
   /**
@@ -55,7 +55,6 @@ export const apiService = {
    * @param {string|number} id - O ID do dispositivo
    */
   collectDevice: async (id) => {
-    // Supondo que o endpoint de disparar coleta é um POST em /devices/{id}/collect
     return await api.post(`/devices/${id}/collect`);
   },
 

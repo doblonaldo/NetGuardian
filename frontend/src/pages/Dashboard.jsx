@@ -1,84 +1,115 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, Server, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Activity, Server, AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
+import Card from '../components/Card';
+import StatusBadge from '../components/StatusBadge';
+import Loader from '../components/Loader';
+import useAutoRefresh from '../hooks/useAutoRefresh';
+import { apiService } from '../services/api';
 
 export default function Dashboard() {
   const [validations, setValidations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchValidations = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/validations`);
-        if (response.ok) {
-          const data = await response.json();
-          setValidations(Array.isArray(data) ? data : []);
-        } else {
-          console.error("Erro ao buscar validações");
-        }
-      } catch (error) {
-        console.error("Falha na requisição:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchValidations();
-    const interval = setInterval(fetchValidations, 30000);
-    return () => clearInterval(interval);
+  // Função assíncrona que o hook irá chamar a cada 30 segundos
+  const fetchValidations = useCallback(async () => {
+    try {
+      const data = await apiService.getValidations();
+      setValidations(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Falha na requisição:", error);
+      throw error; // Repassa para o hook capturar
+    } finally {
+      setInitialLoading(false);
+    }
   }, []);
 
-  // 1. Cards de resumo
-  const uniqueDevices = new Set(validations.map(v => v.device_name || v.device || v.host)).size;
-  const totalAlerts = validations.length;
-  const criticalAlerts = validations.filter(v => v.severity?.toUpperCase() === 'CRITICAL').length;
-  const warningAlerts = validations.filter(v => v.severity?.toUpperCase() === 'WARNING').length;
+  // Utilizamos o hook para controlar os ciclos
+  const { secondsAgo, isFetching, error, manualRefresh } = useAutoRefresh(fetchValidations, 30000);
+
+  // 1. Cards de resumo (Memoizados)
+  const { uniqueDevices, totalAlerts, criticalAlerts, warningAlerts } = useMemo(() => {
+    const uniqueDevices = new Set(validations.map(v => v.device_name || v.device || v.host)).size;
+    const totalAlerts = validations.length;
+    const criticalAlerts = validations.filter(v => v.severity?.toUpperCase() === 'CRITICAL').length;
+    const warningAlerts = validations.filter(v => v.severity?.toUpperCase() === 'WARNING').length;
+    return { uniqueDevices, totalAlerts, criticalAlerts, warningAlerts };
+  }, [validations]);
 
   const stats = [
-    { label: 'Total de Devices', value: uniqueDevices.toString(), icon: Server, color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/20' },
-    { label: 'Total de Alertas', value: totalAlerts.toString(), icon: Activity, color: 'text-purple-400', bg: 'bg-purple-400/10', border: 'border-purple-400/20' },
-    { label: 'Críticos', value: criticalAlerts.toString(), icon: AlertTriangle, color: 'text-rose-400', bg: 'bg-rose-400/10', border: 'border-rose-400/20' },
-    { label: 'Warnings', value: warningAlerts.toString(), icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-400/10', border: 'border-amber-400/20' },
+    { label: 'Total de Devices', value: uniqueDevices.toString(), icon: Server, color: 'text-blue-400', bg: 'bg-blue-400/10' },
+    { label: 'Total de Alertas', value: totalAlerts.toString(), icon: Activity, color: 'text-purple-400', bg: 'bg-purple-400/10' },
+    { label: 'Críticos', value: criticalAlerts.toString(), icon: AlertTriangle, color: 'text-rose-400', bg: 'bg-rose-400/10' },
+    { label: 'Warnings', value: warningAlerts.toString(), icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-400/10' },
   ];
 
-  // 3. Indicador visual por cor
-  const getSeverityStyles = (severity) => {
-    switch (severity?.toUpperCase()) {
-      case 'CRITICAL': return { dot: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]', text: 'text-rose-500' };
-      case 'WARNING': return { dot: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]', text: 'text-amber-500' };
-      case 'INFO': return { dot: 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]', text: 'text-blue-500' };
-      default: return { dot: 'bg-slate-500', text: 'text-slate-500' };
-    }
-  };
+  const sortedAlerts = useMemo(() => {
+    const getSeverityWeight = (severity) => {
+      switch (severity?.toUpperCase()) {
+        case 'CRITICAL': return 3;
+        case 'WARNING': return 2;
+        case 'INFO': return 1;
+        default: return 0;
+      }
+    };
+    return [...validations].sort((a, b) => getSeverityWeight(b.severity) - getSeverityWeight(a.severity));
+  }, [validations]);
+
+  if (initialLoading) {
+    return <Loader text="Carregando painel principal..." />;
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">NOC Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white tracking-tight">NOC Dashboard</h1>
+            {criticalAlerts > 0 && (
+              <span className="bg-rose-500/20 text-rose-500 border border-rose-500/50 px-2.5 py-0.5 rounded-full text-xs font-bold animate-pulse flex items-center gap-1 shadow-[0_0_12px_rgba(244,63,94,0.3)]">
+                <AlertTriangle className="w-3 h-3" /> {criticalAlerts} CRÍTICOS
+              </span>
+            )}
+          </div>
           <p className="text-slate-400 text-sm mt-1">Visão geral da rede em tempo real e validações recentes.</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-blue-500/20 active:scale-95 flex items-center gap-2">
-          <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? 'Atualizando...' : 'Atualizar Agora'}
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <button 
+            onClick={manualRefresh}
+            disabled={isFetching}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            <Activity className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Atualizando...' : 'Atualizar Agora'}
+          </button>
+          <span className="text-xs text-slate-500 flex items-center gap-1">
+            <Clock className="w-3 h-3" /> Atualizado há {secondsAgo}s
+          </span>
+        </div>
       </div>
+
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-500/50 rounded-lg p-4 flex items-center gap-3 animate-in fade-in">
+          <XCircle className="w-5 h-5 text-rose-500" />
+          <p className="text-rose-200 text-sm font-medium">{error}</p>
+        </div>
+      )}
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => {
           const Icon = stat.icon;
           return (
-            <div key={i} className={`bg-slate-800/40 backdrop-blur-sm border ${stat.border} p-5 rounded-xl hover:bg-slate-800/60 transition-all group shadow-sm`}>
+            <Card key={i} className="hover:scale-[1.02] transition-transform">
               <div className="flex items-center justify-between mb-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.bg} ${stat.color}`}>
                   <Icon className="w-5 h-5" />
                 </div>
               </div>
               <div>
                 <p className="text-3xl font-bold text-white tracking-tight">{stat.value}</p>
-                <p className="text-sm font-medium text-slate-400 mt-1">{stat.label}</p>
+                <p className="text-sm font-medium text-slate-400 mt-1 uppercase tracking-wider">{stat.label}</p>
               </div>
-            </div>
+            </Card>
           );
         })}
       </div>
@@ -86,13 +117,9 @@ export default function Dashboard() {
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Chart Area */}
-        <div className="lg:col-span-2 bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6 min-h-[400px] flex flex-col shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-white">Status da Operação</h3>
-          </div>
-          <div className="flex-1 border border-slate-700/50 rounded-lg bg-slate-900/30 flex items-center justify-center relative overflow-hidden group">
-            {/* Abstract Background Chart Elements */}
-            <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity">
+        <Card title="Status da Operação" className="lg:col-span-2 min-h-[400px]">
+          <div className="flex-1 border border-noc-border rounded-lg bg-noc-bg/50 flex items-center justify-center relative overflow-hidden group h-full">
+            <div className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity">
               <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
                 <path d="M0,100 C20,80 30,90 50,60 C70,30 80,40 100,10 L100,100 Z" fill="url(#gradient)" />
                 <path d="M0,100 C20,80 30,90 50,60 C70,30 80,40 100,10" fill="none" stroke="#3b82f6" strokeWidth="1" />
@@ -105,47 +132,59 @@ export default function Dashboard() {
               </svg>
             </div>
             
-            <div className="text-center z-10">
-              <CheckCircle className="w-12 h-12 text-blue-500 mx-auto mb-3 animate-pulse" />
-              <p className="text-slate-300 text-lg font-medium">Monitoramento Ativo</p>
-              <p className="text-slate-500 text-sm mt-1">Coletando métricas e validações...</p>
+            <div className="text-center z-10 flex flex-col items-center justify-center min-h-[250px]">
+              {criticalAlerts > 0 ? (
+                <>
+                  <AlertTriangle className="w-16 h-16 text-rose-500 mx-auto mb-3 animate-pulse" />
+                  <p className="text-rose-400 text-xl font-bold">Atenção Necessária</p>
+                  <p className="text-rose-500/70 text-sm mt-1">Existem alertas críticos na rede.</p>
+                </>
+              ) : error ? (
+                <>
+                  <XCircle className="w-16 h-16 text-rose-500 mx-auto mb-3" />
+                  <p className="text-slate-300 text-xl font-bold">Falha de Conexão</p>
+                  <p className="text-rose-400 text-sm mt-1">Não foi possível carregar os dados de monitoramento.</p>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-16 h-16 text-blue-500 mx-auto mb-3 animate-pulse" />
+                  <p className="text-slate-300 text-xl font-bold">Monitoramento Ativo</p>
+                  <p className="text-slate-500 text-sm mt-1">Coletando métricas e validações...</p>
+                </>
+              )}
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* 2. Lista de alertas recentes */}
-        <div className="bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-xl p-6 shadow-sm overflow-hidden flex flex-col max-h-[500px]">
-          <div className="flex items-center justify-between mb-6 shrink-0">
-            <h3 className="text-lg font-semibold text-white">Alertas Recentes</h3>
-            <span className="text-xs px-2 py-1 bg-slate-800 text-slate-300 rounded-md border border-slate-700 flex items-center gap-1">
+        <Card 
+          title="Alertas Recentes" 
+          action={
+            <span className="text-xs px-2 py-1 bg-noc-bg text-slate-300 rounded border border-noc-border flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               Live
             </span>
-          </div>
-          
-          <div className="space-y-3 overflow-y-auto pr-2 flex-1">
-            {loading && validations.length === 0 ? (
-              <div className="text-center py-8 text-slate-500 text-sm">Carregando alertas...</div>
+          }
+          className="max-h-[500px]"
+        >
+          <div className="space-y-3 overflow-y-auto pr-2 h-full">
+            {isFetching && validations.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-sm flex justify-center"><Activity className="w-6 h-6 animate-spin text-blue-500" /></div>
             ) : validations.length === 0 ? (
               <div className="text-center py-8 text-slate-500 text-sm">Nenhum alerta encontrado.</div>
             ) : (
-              validations.slice(0, 10).map((alert, i) => {
-                const styles = getSeverityStyles(alert.severity);
+              sortedAlerts.slice(0, 10).map((alert, i) => {
+                const isCritical = alert.severity?.toUpperCase() === 'CRITICAL';
                 return (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-slate-800/20 hover:bg-slate-700/40 transition-colors border border-slate-700/30 hover:border-slate-600/50 cursor-pointer">
-                    <div className="mt-1.5 shrink-0">
-                      <span className={`w-2.5 h-2.5 rounded-full inline-block ${styles.dot}`}></span>
-                    </div>
+                  <div key={i} className={`flex items-start gap-3 p-3 rounded-lg transition-colors border cursor-pointer ${isCritical ? 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20' : 'bg-noc-bg/50 border-transparent hover:border-noc-border hover:bg-noc-border/50'}`}>
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-0.5 gap-2">
-                        <p className="text-sm font-medium text-slate-200 truncate">
+                      <div className="flex justify-between items-start mb-1 gap-2">
+                        <p className={`text-sm font-medium truncate ${isCritical ? 'text-rose-100' : 'text-slate-200'}`}>
                           {alert.device_name || alert.device || alert.host || 'Unknown Device'}
                         </p>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider shrink-0 ${styles.text}`}>
-                          {alert.severity || 'UNKNOWN'}
-                        </span>
+                        <StatusBadge status={alert.severity} className="shrink-0" />
                       </div>
-                      <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                      <p className={`text-xs line-clamp-2 leading-relaxed ${isCritical ? 'text-rose-200/70' : 'text-slate-400'}`}>
                         {alert.message || alert.description || alert.rule_name || 'No message provided'}
                       </p>
                     </div>
@@ -154,7 +193,7 @@ export default function Dashboard() {
               })
             )}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );
