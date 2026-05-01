@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Search, Filter, Clock, AlertTriangle, XCircle } from 'lucide-react';
 import Card from '../components/Card';
 import Table from '../components/Table';
@@ -10,6 +11,7 @@ import { apiService } from '../services/api';
 export default function Validations() {
   const [validations, setValidations] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
+  const navigate = useNavigate();
   
   const [filterDevice, setFilterDevice] = useState('');
   const [filterSeverity, setFilterSeverity] = useState('ALL');
@@ -166,6 +168,7 @@ export default function Validations() {
             columns={columns} 
             data={filteredAndSortedValidations} 
             emptyMessage="Nenhuma validação encontrada para os filtros atuais."
+            onRowClick={(row) => row.device_id && navigate(`/devices/${row.device_id}`)}
             rowClassName={(row) => row.severity?.toUpperCase() === 'CRITICAL' ? 'bg-rose-500/10 border-l border-rose-500/50 hover:bg-rose-500/20 shadow-[inset_0_0_20px_rgba(244,63,94,0.05)]' : ''}
           />
         )}

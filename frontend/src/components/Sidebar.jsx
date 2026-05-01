@@ -1,15 +1,35 @@
-import React from 'react';
-import { LayoutDashboard, Activity, Server, Shield, Settings, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
+import { LayoutDashboard, Activity, Server, Shield, Settings, X, WifiOff } from 'lucide-react';
+import { apiService } from '../services/api';
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', active: true },
-  { icon: Activity, label: 'Telemetry', active: false },
-  { icon: Server, label: 'Devices', active: false },
-  { icon: Shield, label: 'Audits', active: false },
-  { icon: Settings, label: 'Settings', active: false },
+  { icon: LayoutDashboard, label: 'Dashboard', to: '/dashboard' },
+  { icon: Activity, label: 'Telemetry', to: '/telemetry' },
+  { icon: Server, label: 'Devices', to: '/devices' },
+  { icon: Shield, label: 'Audits', to: '/audits' },
+  { icon: Settings, label: 'Settings', to: '#' },
 ];
 
 export default function Sidebar({ isOpen, setIsOpen }) {
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    // Verifica periodicamente se a API está online
+    const checkStatus = async () => {
+      try {
+        await apiService.getDevices(); // Ping leve, poderia ser uma rota /health
+        setIsOnline(true);
+      } catch (error) {
+        setIsOnline(false);
+      }
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <>
       {/* Mobile overlay */}
@@ -48,19 +68,24 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               const Icon = item.icon;
               return (
                 <li key={index}>
-                  <a
-                    href="#"
-                    className={`
+                  <NavLink
+                    to={item.to}
+                    onClick={() => setIsOpen(false)}
+                    className={({ isActive }) => `
                       flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
-                      ${item.active 
+                      ${isActive 
                         ? 'bg-blue-600/10 text-blue-400 font-medium shadow-[inset_2px_0_0_0_#3b82f6]' 
                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                       }
                     `}
                   >
-                    <Icon className={`w-5 h-5 ${item.active ? 'text-blue-400' : 'text-slate-500'}`} />
-                    {item.label}
-                  </a>
+                    {({ isActive }) => (
+                      <>
+                        <Icon className={`w-5 h-5 ${isActive ? 'text-blue-400' : 'text-slate-500'}`} />
+                        {item.label}
+                      </>
+                    )}
+                  </NavLink>
                 </li>
               );
             })}
@@ -73,13 +98,20 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-300">API Gateway</span>
-                <span className="flex items-center gap-2 text-emerald-400 text-xs font-medium">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                {isOnline ? (
+                  <span className="flex items-center gap-2 text-emerald-400 text-xs font-medium">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    Online
                   </span>
-                  Online
-                </span>
+                ) : (
+                  <span className="flex items-center gap-2 text-rose-400 text-xs font-medium">
+                    <WifiOff className="w-3 h-3" />
+                    Offline
+                  </span>
+                )}
               </div>
             </div>
           </div>

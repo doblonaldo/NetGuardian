@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Activity, Server, AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import Card from '../components/Card';
 import StatusBadge from '../components/StatusBadge';
@@ -9,6 +10,7 @@ import { apiService } from '../services/api';
 export default function Dashboard() {
   const [validations, setValidations] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
+  const navigate = useNavigate();
 
   // Função assíncrona que o hook irá chamar a cada 30 segundos
   const fetchValidations = useCallback(async () => {
@@ -176,7 +178,11 @@ export default function Dashboard() {
               sortedAlerts.slice(0, 10).map((alert, i) => {
                 const isCritical = alert.severity?.toUpperCase() === 'CRITICAL';
                 return (
-                  <div key={i} className={`flex items-start gap-3 p-3 rounded-lg transition-colors border cursor-pointer ${isCritical ? 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20' : 'bg-noc-bg/50 border-transparent hover:border-noc-border hover:bg-noc-border/50'}`}>
+                  <div 
+                    key={i} 
+                    onClick={() => navigate(alert.device_id ? `/devices/${alert.device_id}` : '#')}
+                    className={`flex items-start gap-3 p-3 rounded-lg transition-colors border cursor-pointer ${isCritical ? 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/20' : 'bg-noc-bg/50 border-transparent hover:border-noc-border hover:bg-noc-border/50'}`}
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start mb-1 gap-2">
                         <p className={`text-sm font-medium truncate ${isCritical ? 'text-rose-100' : 'text-slate-200'}`}>

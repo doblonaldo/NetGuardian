@@ -37,16 +37,33 @@ export const apiService = {
 
   /**
    * Retorna todas as validações ativas (ou histórico) no sistema.
+   * Transforma a resposta agrupada do backend em uma lista flat para o dashboard.
    */
   getValidations: async () => {
-    return await api.get('/validations/');
+    const data = await api.get('/validations/');
+    // Flatten the grouped response: [{device: '...', critical: [], ...}] -> [{...alert, device_name: '...'}]
+    if (Array.isArray(data)) {
+      return data.flatMap(group => {
+        const deviceName = group.device;
+        const allAlerts = [
+          ...(group.critical || []),
+          ...(group.warning || []),
+          ...(group.info || [])
+        ];
+        return allAlerts.map(alert => ({
+          ...alert,
+          device_name: deviceName
+        }));
+      });
+    }
+    return [];
   },
 
   /**
    * Retorna os detalhes de um dispositivo específico.
    * @param {string|number} id - O ID do dispositivo
    */
-  getDeviceDetails: async (id) => {
+  getDeviceById: async (id) => {
     return await api.get(`/devices/${id}`);
   },
 
@@ -60,10 +77,18 @@ export const apiService = {
 
   /**
    * Retorna as validações relativas a um dispositivo específico (Extra Helper).
-   * @param {string|number} id - O ID do dispositivo
    */
   getDeviceValidations: async (id) => {
-    return await api.get(`/devices/${id}/validations`);
+    const group = await api.get(`/devices/${id}/validations`);
+    // Flatten grouped object: {device: '...', critical: [], ...} -> [{...alert}]
+    if (group && typeof group === 'object') {
+      return [
+        ...(group.critical || []),
+        ...(group.warning || []),
+        ...(group.info || [])
+      ];
+    }
+    return [];
   }
 };
 

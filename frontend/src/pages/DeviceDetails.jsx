@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Server, Activity, AlertTriangle, Info as InfoIcon, ArrowLeft, ShieldAlert, Cpu, Play, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import Card from '../components/Card';
 import StatusBadge from '../components/StatusBadge';
 import Loader from '../components/Loader';
 import { apiService } from '../services/api';
 
-export default function DeviceDetails({ deviceId = 1, onBack }) {
+export default function DeviceDetails({ deviceId: propDeviceId, onBack }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const deviceId = propDeviceId || id || 1;
+  
   const [device, setDevice] = useState(null);
   const [validations, setValidations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,7 +23,7 @@ export default function DeviceDetails({ deviceId = 1, onBack }) {
     setError(null);
     try {
       // Fetch Device Details
-      const devData = await apiService.getDeviceDetails(deviceId);
+      const devData = await apiService.getDeviceById(deviceId);
       setDevice(devData);
 
       // Fetch Validations for this Device
@@ -75,11 +80,9 @@ export default function DeviceDetails({ deviceId = 1, onBack }) {
         <button onClick={fetchData} className="mt-4 bg-noc-panel border border-noc-border hover:bg-noc-border text-slate-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
           <RefreshCw className="w-4 h-4" /> Tentar Novamente
         </button>
-        {onBack && (
-          <button onClick={onBack} className="mt-4 text-blue-500 hover:text-blue-400 transition-colors flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" /> Voltar para Lista
-          </button>
-        )}
+        <button onClick={onBack || (() => navigate(-1))} className="mt-4 text-blue-500 hover:text-blue-400 transition-colors flex items-center gap-2">
+          <ArrowLeft className="w-4 h-4" /> Voltar
+        </button>
       </div>
     );
   }
@@ -89,11 +92,9 @@ export default function DeviceDetails({ deviceId = 1, onBack }) {
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500">
         <Server className="w-12 h-12 mb-4 text-slate-600" />
         <p>Equipamento não encontrado.</p>
-        {onBack && (
-          <button onClick={onBack} className="mt-4 text-blue-500 hover:text-blue-400 transition-colors flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" /> Voltar
-          </button>
-        )}
+        <button onClick={onBack || (() => navigate(-1))} className="mt-4 text-blue-500 hover:text-blue-400 transition-colors flex items-center gap-2">
+          <ArrowLeft className="w-4 h-4" /> Voltar
+        </button>
       </div>
     );
   }
@@ -103,12 +104,10 @@ export default function DeviceDetails({ deviceId = 1, onBack }) {
       {/* Header com infos do Device */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div className="w-full sm:w-auto">
-          {onBack && (
-            <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition-colors text-sm">
-              <ArrowLeft className="w-4 h-4" />
-              Voltar para Lista
-            </button>
-          )}
+          <button onClick={onBack || (() => navigate(-1))} className="flex items-center gap-2 text-slate-400 hover:text-white mb-4 transition-colors text-sm">
+            <ArrowLeft className="w-4 h-4" />
+            Voltar
+          </button>
           <div className="flex items-start sm:items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
               <Server className="w-6 h-6" />

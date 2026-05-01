@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.api.routes import devices, validations, sync
-from app.core.database import engine, Base
+from app.core.database import engine, Base, get_db
+from app.utils.seed import seed_database
 import app.models  # Importa todos os models para registrar no Base.metadata
 import contextlib
 
@@ -37,3 +39,13 @@ app.include_router(sync.router, prefix=f"{settings.API_V1_STR}/sync", tags=["syn
 @app.get("/")
 async def root():
     return {"message": "Welcome to NetGuardian API", "docs": "/docs"}
+
+@app.post(f"{settings.API_V1_STR}/seed", tags=["seed"])
+async def seed_data(db: AsyncSession = Depends(get_db)):
+    """
+    Popula o banco de dados com dispositivos e validações de teste.
+    """
+    inserted = await seed_database(db)
+    if inserted:
+        return {"message": "Seed executado com sucesso. Banco populado."}
+    return {"message": "Banco de dados já contém informações. Seed ignorado."}
